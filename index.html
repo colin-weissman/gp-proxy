@@ -1,0 +1,420 @@
+<html><head><script type="text/javascript">
+const lsijVersion = 1;
+
+
+
+class Flags {
+	constructor(url, terms) {
+		this.url = url;
+		this.matched = {};
+
+		this.terms = [];
+		terms.forEach((term) => {
+			let s = term.replace(/[\]{}?^$().*\\+|[]/g, '\\$&');
+			s = s.replace(/\\\*/g, '.*');
+			s = s.replace(/\\\?/g, '.');
+			let regex = new RegExp('\\b' + s + '\\b', 'gi');
+			this.terms.push({term: term, regex: regex});
+		});
+	}
+
+	report(flags) {
+        console.debug('[LS Filter] flag report');
+		if (!flags.length)
+            return;
+
+		const xhr = new XMLHttpRequest();
+		xhr.open('POST', document.location.origin + '/15ef5e1be7eac1c61563ca7c7562a8a54fda1c4571bafcb79e5fe908f8dd2f49/log_flag', true);
+		console.debug('[LS Filter] sending -> ', flags);
+		xhr.send(JSON.stringify({
+			url: this.url.href,
+			flags: flags,
+			at_epoch_ms: Date.now()
+		}));
+	}
+
+	matchTerms(input, flagAll) {
+		const matches = [];
+		this.terms.forEach((term) => {
+			const hits = input.match(term.regex);
+			if (!hits || !hits.length)
+				return;
+
+			let added = false;
+			if (typeof(this.matched[term.term]) === 'undefined')
+				added = true
+
+			let count = hits.length;
+			if (!added)
+				count -= this.matched[term.term];
+
+			this.matched[term.term] = hits.length;
+
+			if (added || flagAll)
+				matches.push([term.term, count]);
+		});
+		return matches;
+	}
+
+	scanIntentValue(value) {
+		const matches = this.matchTerms(value, true);
+		const changes = [];
+		matches.forEach((match) => {
+			match[2] = true; // mark as user entered
+			changes.push(match);
+		});
+
+		if (changes.length)
+			this.report(changes);
+	}
+
+	scanIntentValues(values) {
+		values.forEach((value) => {
+			this.scanIntentValue(value);
+		});
+	}
+
+	scanIntentEvent(event) {
+		switch (event.target.tagName.toLowerCase()) {
+		case 'input':
+			let type = event.target.type || 'text';
+			type = type.toLowerCase();
+
+			// Dont scan password fields
+			if (type === 'password')
+				return;
+			this.scanIntentValue(event.target.value);
+			break;
+		case 'textarea':
+			this.scanIntentValue(event.target.value);
+			break;
+		}
+	}
+
+	scanIntent(event) {
+		if (typeof(gatherIntent) === 'function') {
+			const intent = gatherIntent();
+			if (intent.length)
+				this.scanIntentValues(intent);
+		}
+	}
+
+	onChange(event) {
+		this.scanIntentEvent(event);
+	}
+
+	onKeyup(event) {
+		this.scanIntentEvent(event);
+	}
+
+	bindDOM() {
+		document.addEventListener('change', this.onChange.bind(this));
+		document.addEventListener('keyup', this.onKeyup.bind(this));
+		setInterval(() => {
+			this.scanIntent();
+		}, 1000);
+	}
+}
+
+const initFlagScanning = function(terms) {
+	if (!terms.length)
+		return;
+
+	console.debug('[LS Filter] init flag scanning');
+	const a = document.createElement('A');
+	a.href = window.location.href;
+	const flags = new Flags(a, terms);
+	
+	console.debug('[LS Filter] flagging intent');
+	if (typeof(initGatherIntent) === 'function')
+		initGatherIntent();
+
+	flags.bindDOM();
+	
+};
+
+initFlagScanning(["kill me","painless suicide","kill myself","bomb threat","I want to kill myself","kill my","bomb my school","suicidal","cocaine","meth","heroin","knife","stoned","naked girls","rape","kill yourself","commit suicide","kill your self","drunk","cutting isn't enough anymore","how suicide ","i want to die","binging and purging","shoot","gun","huggy wuggy","how suicide affects family","i hate myself","kill your","how to die","anarchist cookbook","suicide","suicide pact","making a bomb","how suicide affects family and friends","how suicide affects friends","I want to cut myself","kill you","how suicide affects loved ones","how suicide affects others","how suicide affects siblings","how suicide affects society","how suicide affects students","how suicide affects survivors","how suicide attempt","how suicide can be done","how suicide can be prevented","how suicide feels","how suicide happens","how suicide hurts others","how suicide impacts our communities","how suicide is selfish","how suicide is viewed in different cultures","how suicide starts","how suicide works","Lemon Party","blow up school","become a terrorist","bong rips","bulimia ","buy alcohol underage","buy gun","buy knives","cutting yourself","fuck you","gun in school","homemade bomb","how to get revenge","how to hang yourself","how to kill","how to sext","make a bomb","murder suicide","my life is shit","my life is worthless","make a bong","pipe bomb","sex online","sneak gun in school","suicide bomb","suicide by cop","suicide vest","where to buy drugs","states where suicide is illegal","porn","binge and purge","bullet","I want to KMS","suicide chat","suicide gun","suicide help","suicide help chat","suicide helpline","suicide helpline text","suicide hotline","suicide hotline chat","suicide hotline text","suicide notes examples","suicide number","suicide overdose","suicide prevention","suicide where do you go","suicide where is god","suicide where to aim","suicide where to get help","suicide where to go for help","suicide with","suicide with alcohol","suicide with ambien","suicide with carbon monoxide","suicide with charcoal","suicide with cyanide","suicide with dignity","suicide with gun","suicide with insulin","suicide with knife","suicide with nitrogen","suicide with no warning signs","suicide with painkillers","suicide with panadol","suicide with rat poison","suicide with rifle","suicide with the uzi","suicide with tylenol","suicide without ","suicide without a gun","suicide without a mess","suicide without a note","suicide without being found","suicide without damaging organs","suicide without depression","suicide without detection","suicide without evidence","suicide without getting caught","suicide without going to hell","suicide without guilt","suicide without hurting others","suicide without leaving evidence","suicide without mental illness","suicide without notice","suicide without reason","suicide without signs","suicide without trace","suicide without warning","suicide without warning signs","what suicide does to loved ones","what suicide does to others","what suicide does to those left behind","what suicide does to your family","what suicide feels like","what suicide hotlines do","what suicide hurts the least","what suicide is like","what suicide leaves behind","what suicide survivors say","when anxiety gets too much","when anxiety takes over","when suicide becomes an option","when suicide becomes the only option","when suicide goes wrong","when suicide is a good option","when suicide is acceptable","when suicide is an option","when suicide is justified","when suicide is logical","when suicide is okay","when suicide is rational","when suicide is the only option","when suicide is the only solution","when suicide is the only way out","when suicide is the right option","when suicide is the right thing to do","when suicide is understandable","when suicide makes sense","which suicide plan is most lethal","why suicide","why suicide is a good option","why suicide is an option","why suicide is good for you","why suicide is never the answer","why suicide is not an option","why suicide is not the answer","why suicide is the best option","why suicide isn't the answer","will suicide ","will suicide affect my family","will suicide end my pain","will suicide end the pain","will suicide help","will suicide hotline call police","will suicide hurt","will suicide hurt my family","will suicide keep you from heaven","will suicide lead to hell","will suicide solve my problems","will suicide take me to hell","will suicide take you to hell","will suicide victims go to heaven","#sue","KMS","how to join ISIS","how to join a gang","how to sneak things past security","naked pics"]);
+
+
+
+function checkCurrentSite(yt, url) {
+  const xhr = new XMLHttpRequest();
+  const body = JSON.stringify({
+    url: url || window.location.href,
+    youtube: yt
+  });
+  console.log('[LS Filter] reporting ->', body);
+  const checkUrl = document.location.origin + '/15ef5e1be7eac1c61563ca7c7562a8a54fda1c4571bafcb79e5fe908f8dd2f49/log';
+  xhr.open('POST', checkUrl, true);
+  xhr.send(body);
+  xhr.onreadystatechange = function () {
+    if (this.status === 200 && xhr.responseText) {
+      const score = JSON.parse(xhr.responseText);
+      console.log('[LS Filter] score ->', score.allow);
+      if (score.redirect) {
+        window.location.href = score.redirect;
+        hardBlock();
+      }
+    }
+  };
+}
+
+let hardBlockPolicy;
+function getHardBlockPolicy() {
+  if (typeof(trustedTypes) !== 'undefined' && !hardBlockPolicy) {
+    hardBlockPolicy = trustedTypes.createPolicy('hardBlock', {
+      createHTML: (string) => string
+    });
+  }
+  return hardBlockPolicy;
+}
+
+function hardBlock() {
+  stopVideo();
+  const stopInt = setInterval(stopVideo, 500);
+  setTimeout(() => {
+    const policy = getHardBlockPolicy();
+    if (policy) {
+      document.body.innerHTML = policy.createHTML('<img src="/15ef5e1be7eac1c61563ca7c7562a8a54fda1c4571bafcb79e5fe908f8dd2f49/blocked-image-search.png" style="width: 100%; height: 100%">');
+    } else {
+      document.body.innerHTML = '<img src="/15ef5e1be7eac1c61563ca7c7562a8a54fda1c4571bafcb79e5fe908f8dd2f49/blocked-image-search.png" style="width: 100%; height: 100%">';
+    }
+    clearInterval(stopInt);
+  }, 3000)
+}
+
+function stopVideo() {
+  const ea = document.getElementsByTagName('video');
+  for (i in ea) {
+    if (typeof(ea[i].pause) !== 'function') {
+      continue;
+    }
+    if (!ea[i].paused) {
+        console.debug('[LS Filter] pause video');
+        ea[i].pause();
+    }
+  }
+}
+
+function googleVideo() {
+  if (window.location.href.match(/google\.com\/search\?/)) {
+    const vidMatcher = /google\.com\/search\?.*vid:([^#\&\?]{11})/;
+    let prevVideo;
+    new MutationObserver(function() {
+      console.log('[LS Filter] MutationObserver');
+      let video;
+      let m = window.location.href.match(vidMatcher)
+      if (m) {
+        video = m[1];
+      }
+      if (video === prevVideo) { return; }           
+      console.log('[LS Filter] scoring video ->', video);
+      prevVideo = video;
+      checkCurrentSite(true, 'https://www.youtube.com/watch?v=' + video);
+    }).observe(document, {subtree: true, childList: true});
+  }
+}
+
+function onLoad() {
+  console.log('[LS Filter] loaded');
+  if (window.top === window.self) {
+    console.log('[LS Filter] top window: ' + window.location.href);
+    googleVideo();
+  }
+}
+
+onLoad();
+
+</script>
+    <title>Math Is Fun</title>
+    <script src="uv/uv.bundle.js"></script>
+    <script src="uv/uv.config.js"></script>
+    <script>
+      function search(event) {
+        event.preventDefault();
+        const searchInput = document.getElementById("searchInput");
+        const query = searchInput.value.trim();
+        let url = "";
+        try {
+          const urlObject = new URL(query);
+          if (urlObject.protocol !== "http:" && urlObject.protocol !== "https:") {
+            urlObject.protocol = "https:";
+          }
+          url = urlObject.toString();
+        } catch {
+          if (/^[a-z]+\.[a-z]{2,}$/i.test(query)) {
+            url = "https://" + query;
+          } else {
+            const searchEngine = localStorage.getItem("searchengine");
+            if (searchEngine === "google") {
+              url = "https://google.com/search?q=" + encodeURIComponent(query);
+            } else if (searchEngine === "duckduckgo") {
+              url = "https://duckduckgo.com/?q=" + encodeURIComponent(query);
+            //} else if (searchEngine === "bing") {
+            //  url = "https://bing.com/search?q=" + encodeURIComponent(query);
+            } else {
+              url = "https://bing.com/search?q=" + encodeURIComponent(query);
+            };
+          }
+        }
+        window.navigator.serviceWorker.register("/sw.js", {
+          scope: __uv$config.prefix
+        }).then(() => {
+          console.log("Service worker registration successful");
+          sessionStorage.setItem("uvURL", __uv$config.encodeUrl(url));
+          location.href = "go.html";
+          console.log("Redirection to html-loader successful");
+        }).catch((error) => {
+          console.error("Service worker registration failed:", error);
+        });
+      }
+    </script>
+    <link rel="stylesheet" href="assets/go.css">
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: Arial, sans-serif;
+      }
+
+      .logo img {
+        max-height: 100%;
+        max-width: 100%;
+      }
+
+      .top-bar {
+        position: fixed;
+        top: -50px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 80%;
+        max-width: 600px;
+        height: 60px;
+        background-color: black;
+        color: #fff;
+        padding: 10px;
+        box-sizing: border-box;
+        border-radius: 25px;
+        transition: all 0.3s ease-in-out;
+      }
+
+      .top-bar:hover {
+        top: 0;
+        height: 60px;
+      }
+
+      .logo {
+        float: left;
+        margin-right: 10px;
+        height: 40px;
+        line-height: 40px;
+      }
+
+      .search-box {
+        float: left;
+        width: calc(100% - 80px);
+        margin-top: 5px;
+        display: flex;
+        align-items: center;
+        float: left;
+        width: calc(100% - 80px);
+        margin-top: 5px;
+      }
+
+      .search-box input[type="text"] {
+        height: 30px;
+        padding: 0 10px;
+        border: none;
+        border-radius: 15px;
+        background-color: transparent;
+        box-sizing: border-box;
+        transition: all 0.3s ease-in-out;
+        width: 100%;
+        font-size: 16px;
+        color: #fff;
+      }
+
+      .search-box input[type="text"]::placeholder {
+        color: #fff;
+      }
+
+      .search-box input[type="text"]:focus {
+        outline: none;
+        box-shadow: none;
+      }
+
+      .search-box button {
+        height: 30px;
+        padding: 0 10px;
+        background-color: rgba(255, 255, 255, 0.1);
+        border: none;
+        border-radius: 15px;
+        cursor: pointer;
+        float: right;
+        margin-top: 5px;
+        margin-left: 5px;
+        box-sizing: border-box;
+      }
+    </style>
+    <script>
+      window.addEventListener('DOMContentLoaded', () => {
+        const topBar = document.querySelector('.top-bar');
+        const pageTop = document.documentElement.scrollTop || document.body.scrollTop;
+        if (pageTop === 0) {
+          topBar.style.top = '-50px';
+        }
+        let topBarVisible = false;
+        document.addEventListener('mousemove', event => {
+          if (event.clientY <= 50) {
+            if (!topBarVisible) {
+              topBar.style.top = '0';
+              topBarVisible = true;
+            }
+          } else {
+            if (topBarVisible) {
+              topBar.style.top = '-50px';
+              topBarVisible = false;
+            }
+          }
+        });
+      });
+    </script>
+    <script>
+      window.onload = function() {
+        var iframe = document.querySelector('iframe[src="/service/hvtrs8%2F-nmw%2Cge%2Frlcy-rmbnoz-aoppmrctkol%2F7369-rmbnoz"]');
+        if (iframe) {
+          var iframeContent = iframe.contentWindow;
+          var iframeDocument = iframeContent.document;
+          var elementWithinIframe = iframeDocument.querySelector('.sc-kQoPux.gXxnRy.footer');
+          var elementWithinIframe1 = iframeDocument.getElementById('js-game-video');
+          if (elementWithinIframe) {
+            elementWithinIframe.style.marginTop = '375px';
+            elementWithinIframe1.style.marginTop = '375px';
+          }
+        }
+      };
+    </script>
+  </head>
+  <body>
+    <div class="top-bar" style="top: -50px;">
+      <div class="logo">
+        <img src="assets/favicon/logo.png" alt="Logo">
+      </div>
+      <div class="search-box">
+        <form onsubmit="search(event)">
+          <input type="text" id="searchInput" placeholder="Search...">
+        </form>
+      </div>
+    </div>
+    <iframe src="/service/hvtrs8%2F-bkne.aoo%2Fqecrah%3Dq%3Ftkkvoi" id="iframeid"></iframe>
+    <script>
+      window.onload = function() {
+        let uvURL = sessionStorage.getItem("uvURL");
+        uvURL = "/service/" + uvURL;
+        console.log(uvURL);
+        document.querySelector("#iframeid").src = uvURL;
+      }
+    </script>
+  
+
+</body></html>
